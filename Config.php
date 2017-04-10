@@ -10,17 +10,17 @@
  * http://opensource.org/licenses/osl-3.0.php
  * If you did not receive a copy of the license and are unable to
  * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
+ * to license@magento.com so we can send you a copy immediately.
  *
  * DISCLAIMER
  *
  * Do not edit or add to this file if you wish to upgrade Magento to newer
  * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
+ * needs please refer to http://www.magento.com for more information.
  *
  * @category    Mage
  * @package     Mage_Core
- * @copyright   Copyright (c) 2014 Magento Inc. (http://www.magentocommerce.com)
+ * @copyright  Copyright (c) 2006-2017 X.commerce, Inc. and affiliates (http://www.magento.com)
  * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 
@@ -256,7 +256,9 @@ class Mage_Core_Model_Config extends Mage_Core_Model_Config_Base
         if ($cacheLoad) {
             return $this;
         }
+
         $this->_useCache = false;
+
         $this->loadModules();
         $this->loadDb();
         $this->saveCache();
@@ -302,7 +304,6 @@ class Mage_Core_Model_Config extends Mage_Core_Model_Config_Base
                 }
             }
         }
-
         return false;
     }
 
@@ -395,7 +396,7 @@ class Mage_Core_Model_Config extends Mage_Core_Model_Config_Base
 
         if ($disableLocalModules && !defined('COMPILER_INCLUDE_PATH')) {
             set_include_path(
-                // excluded '/app/code/local'
+            // excluded '/app/code/local'
                 BP . DS . 'app' . DS . 'code' . DS . 'community' . PS .
                 BP . DS . 'app' . DS . 'code' . DS . 'core' . PS .
                 BP . DS . 'lib' . PS .
@@ -486,7 +487,6 @@ class Mage_Core_Model_Config extends Mage_Core_Model_Config_Base
         }
         unset($this->_cachePartsForSave);
         $this->_removeCache($cacheLockId);
-
         return $this;
     }
 
@@ -971,6 +971,12 @@ class Mage_Core_Model_Config extends Mage_Core_Model_Config_Base
                 foreach ($fileName as $configFile) {
                     $configFile = $this->getModuleDir('etc', $modName).DS.$configFile;
                     if ($mergeModel->loadFile($configFile)) {
+
+                        $this->_makeEventsLowerCase(Mage_Core_Model_App_Area::AREA_GLOBAL, $mergeModel);
+                        $this->_makeEventsLowerCase(Mage_Core_Model_App_Area::AREA_FRONTEND, $mergeModel);
+                        $this->_makeEventsLowerCase(Mage_Core_Model_App_Area::AREA_ADMIN, $mergeModel);
+                        $this->_makeEventsLowerCase(Mage_Core_Model_App_Area::AREA_ADMINHTML, $mergeModel);
+
                         $mergeToObject->extend($mergeModel, true);
                     }
                 }
@@ -1169,7 +1175,7 @@ class Mage_Core_Model_Config extends Mage_Core_Model_Config_Base
         }
 
         foreach ($events as $event) {
-            $eventName = $event->getName();
+            $eventName = strtolower($event->getName());
             $observers = $event->observers->children();
             foreach ($observers as $observer) {
                 switch ((string)$observer->type) {
@@ -1645,5 +1651,43 @@ class Mage_Core_Model_Config extends Mage_Core_Model_Config_Base
             return $this->getModelClassName($factoryName);
         }
         return false;
+    }
+
+    /**
+     * Makes all events to lower-case
+     *
+     * @param string $area
+     * @param Varien_Simplexml_Config $mergeModel
+     */
+    protected function _makeEventsLowerCase($area, Varien_Simplexml_Config $mergeModel)
+    {
+        $events = $mergeModel->getNode($area . "/" . Mage_Core_Model_App_Area::PART_EVENTS);
+        if ($events !== false) {
+            $children = clone $events->children();
+            /** @var Mage_Core_Model_Config_Element $event */
+            foreach ($children as $event) {
+                if ($this->_isNodeNameHasUpperCase($event)) {
+                    $oldName = $event->getName();
+                    $newEventName = strtolower($oldName);
+                    if (!isset($events->$newEventName)) {
+                        /** @var Mage_Core_Model_Config_Element $newNode */
+                        $newNode = $events->addChild($newEventName, $event);
+                        $newNode->extend($event);
+}
+                    unset($events->$oldName);
+                }
+            }
+        }
+    }
+
+    /**
+     * Checks is event name has upper-case letters
+     *
+     * @param Mage_Core_Model_Config_Element $event
+     * @return bool
+     */
+    protected function _isNodeNameHasUpperCase(Mage_Core_Model_Config_Element $event)
+    {
+        return (strtolower($event->getName()) !== (string)$event->getName());
     }
 }
